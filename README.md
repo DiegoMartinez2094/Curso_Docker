@@ -175,7 +175,7 @@ para mantener el proceso corriendo aunque de el comando exit, alwaysup es el nom
 
 ---
 
-para matar ese proceso docker kill alwaysup
+para matar ese proceso 
 
 ---
 
@@ -219,9 +219,229 @@ pero queremos que apnte al puerto con este comando:
 docker run --name proxy -d -p 8080:80 nginx
 ```
 
-como vemos cambio la parte del puerto: 
+En resumen, la diferencia principal entre los dos comandos es que el primer comando especifica explícitamente que el contenedor se debe ejecutar en segundo plano con la opción `-d`, mientras que el segundo comando no especifica explícitamente el modo de ejecución y, por lo tanto, el contenedor se ejecutará en primer plano.
+
+como vemos cambio la parte del puerto:
 
 ```
 CONTAINER ID   IMAGE     COMMAND                  CREATED         STATUS         PORTS                  NAMES
 8d6e648ca4a0   nginx     "/docker-entrypoint.…"   8 seconds ago   Up 3 seconds   0.0.0.0:8080->80/tcp   proxy
+```
+
+
+para ver en tiempo real que está pasando con el contenedor: 
+
+```
+docker logs <nombreContenedor>
+```
+
+
+---
+
+# bind mount 
+
+(compartir informacion, archivos o directorios entre contenedores y la maquina anfitriona) pero esto no es muy seguro
+
+para ello Docker nos da una opcion llamada **Volumenes**
+
+
+# *VOLUMENES  de Docker*
+
+Volumenes es entre contenedores:
+
+para ver los volumenes que hay :
+
+```
+docker volume ls
+```
+
+para crear Volumenes: 
+
+```
+docker volume create dbdata
+```
+
+volvemos a:
+
+```
+docker volume ls 
+```
+
+nos da: 
+
+```
+DRIVER    VOLUME NAME
+local     dbdata
+```
+
+docker ya reservo un espacio en el disco para ese volumen,
+
+ahora vamos a crear un contenedor y montarle el columen que creamos:
+
+```
+docker run -d --name db --mount src=dbdata,dst=/data/db mongo
+```
+
+creamos el contenedor db y montamos el volumen dbdata en el destino (/data/db) del contenedor= mongo
+
+ahora como no tenemos la imagen de mongo, la instala automaticamente, cuando finaliza damos el comando 
+
+```
+docker ps
+```
+
+nos sale:
+
+```
+CONTAINER ID   IMAGE     COMMAND                  CREATED              STATUS              PORTS       NAMES
+27f8ff941802   mongo     "docker-entrypoint.s…"   About a minute ago   Up About a minute   27017/tcp   db
+```
+
+ahora damos :
+
+```
+docker inspect db
+```
+
+nos sale la informacion del contenedor, en la parte de mount encontramos la informacion del volumen:
+
+```
+ "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "dbdata",
+                "Source": "/var/lib/docker/volumes/dbdata/_data",
+                "Destination": "/data/db",
+                "Driver": "local",
+                "Mode": "z",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "0ae283cb84868d47dac85d75d219c432f2eee741a3f57c0249705cbc758bcc97",
+                "Source": "/var/lib/docker/volumes/0ae283cb84868d47dac85d75d219c432f2eee741a3f57c0249705cbc758bcc97/_data",
+                "Destination": "/data/configdb",
+                "Driver": "local",
+                "Mode": "",
+                "RW": true,
+                "Propagation": ""
+            }
+        ],
+```
+
+---
+
+Ahora para entrar al contenedor: 
+
+```
+docker exec -it db bash
+```
+
+luego el comando: 
+
+```
+mongosh
+```
+
+nos genera: 
+
+```
+Current Mongosh Log ID: 652c6539478070a05d7679b2
+Connecting to:          mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.0.1
+Using MongoDB:          7.0.2
+Using Mongosh:          2.0.1
+
+For mongosh info see: https://docs.mongodb.com/mongodb-shell/
+
+
+To help improve our products, anonymous usage data is collected and sent to MongoDB periodically (https://www.mongodb.com/legal/privacy-policy).
+You can opt-out by running the disableTelemetry() command.
+
+------
+   The server generated these startup warnings when booting
+   2023-10-15T22:10:25.025+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2023-10-15T22:10:30.770+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2023-10-15T22:10:30.779+00:00: /sys/kernel/mm/transparent_hugepage/enabled is 'always'. We suggest setting it to 'never'
+   2023-10-15T22:10:30.779+00:00: vm.max_map_count is too low
+------
+
+test>
+
+```
+
+ahora estamos dentro de la imagen de mongo:
+
+para continuar, creamos una base de datyos llamada platzi:
+
+```
+use platzi
+```
+
+y luego insertamos un dato:
+
+```
+db.collection.insertOne({"nombre": "Diego"})
+```
+
+nos confirmará con el mensaje: 
+
+```
+{
+  acknowledged: true,
+  insertedId: ObjectId("652c67c1478070a05d7679b3")
+}
+```
+
+verificamos con :
+
+```
+db.collection.find()
+
+```
+
+nos da: 
+
+```
+[ { _id: ObjectId("652c67c1478070a05d7679b3"), nombre: 'Diego' } ]
+```
+
+ya confirmado esto, cerramos el contenedor con los comandos exit, salimos de la imagen y luego exit salimos de linux, quedamos en la maquina anfitriona 
+
+con el comando: docker ps, vemos que aún está activo el contenedor, eliminamos el contenedor con el comando: docker rm -f db
+
+ahora para probar que el volumen que habíamos creado no se ha eliminado al eliminar el contenedor db, creamos otro contenedor con el mismo comando : 
+
+```
+docker run -d --name database --mount src=dbdata,dst=/data/db mongo
+```
+
+y entramos al contenedor:
+
+```
+docker exec -it database bash
+```
+
+ejecutamos el comando:
+
+```
+mongosh
+```
+
+luego el comando:
+
+```
+use platzi
+```
+
+luego el comando de encontrar datos de una coleccion:
+
+```
+db.collection.find()
+```
+
+y nos dará:
+
+```
+[ { _id: ObjectId("652c67c1478070a05d7679b3"), nombre: 'Diego' } ]
 ```
